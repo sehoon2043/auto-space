@@ -49,10 +49,11 @@ AutoCandidates(w, h) {
 }
 
 ; 후보들을 모두 덮는 사각형 {x, y, w, h} (클라이언트 좌표) - 이만큼만 캡처하면 된다
-AutoBounds(cands) {
+; ring = 후보 중심에서 볼 반지름 (기준 화면 픽셀)
+AutoBounds(cands, ring := AUTO_RING) {
     x1 := 99999, y1 := 99999, x2 := -99999, y2 := -99999
     for c in cands {
-        r := Ceil(AUTO_RING * c.s) + 1
+        r := Ceil(ring * c.s) + 1
         x1 := Min(x1, c.x - r), y1 := Min(y1, c.y - r)
         x2 := Max(x2, c.x + r), y2 := Max(y2, c.y + r)
     }
@@ -74,17 +75,17 @@ AutoClassify(img, cx, cy, s) {
         return "on"
     if warm > n * 0.03
         return ""
-    if MatchOffShape(img, cx + Round(7 * s), cy + Round(s), s)
+    if MatchShape(img, cx + Round(7 * s), cy + Round(s), s, AUTO_OFF_SHAPE, IsDark)
         return "off"
     return ""
 }
 
-; (lx, ly)를 글자 중심으로 놓고 AUTO_OFF_SHAPE 와 맞춰 본다. 위치가 1~2픽셀 어긋나도 되게 주변도 본다.
-; 흰 글씨 자리 70% 이상이 밝고, 바탕 자리 85% 이상이 어두워야 꺼진 AUTO 버튼으로 본다.
-MatchOffShape(img, lx, ly, s) {
+; (lx, ly)를 틀(rows) 중심으로 놓고 맞춰 본다. 위치가 1~2픽셀 어긋나도 되게 주변도 본다.
+; 흰 글씨 자리 70% 이상이 밝고, 바탕 자리 85% 이상이 isBg 여야 맞은 것으로 본다.
+MatchShape(img, lx, ly, s, rows, isBg) {
     j := Max(2, Round(2 * s))
     for phase in [[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]] {  ; 반 픽셀 어긋남
-        shape := OffShapeAt(s, phase)
+        shape := ShapeAt(rows, s, phase)
         if !shape.light.Length || !shape.dark.Length
             continue
         loop 2 * j + 1 {
@@ -99,7 +100,7 @@ MatchOffShape(img, lx, ly, s) {
                     continue
                 hit := 0
                 for p in shape.dark
-                    if IsDark(ImgPixel(img, ox + p[1], oy + p[2]))
+                    if isBg(ImgPixel(img, ox + p[1], oy + p[2]))
                         hit += 1
                 if hit >= shape.dark.Length * 0.85
                     return true
@@ -109,16 +110,16 @@ MatchOffShape(img, lx, ly, s) {
     return false
 }
 
-; AUTO_OFF_SHAPE 를 배율 s로 줄이거나 키운 픽셀 목록 {light, dark} (글자 중심 기준 [u, v])
-; 화면 픽셀 하나가 덮는 틀 칸들을 4x4로 훑어서, 3/4 이상이 # 이면 밝아야 할 곳, 전부 . 이면 어두워야 할 곳.
+; 틀(rows)을 배율 s로 줄이거나 키운 픽셀 목록 {light, dark} (틀 중심 기준 [u, v])
+; 화면 픽셀 하나가 덮는 틀 칸들을 4x4로 훑어서, 3/4 이상이 # 이면 밝아야 할 곳, 전부 . 이면 바탕이어야 할 곳.
 ; 창이 작아지면 2픽셀 굵기 글씨가 1픽셀대로 뭉개지므로 틀도 같이 줄여야 맞는다.
-OffShapeAt(s, phase) {
+ShapeAt(rows, s, phase) {
     static cache := Map()
-    key := Round(s, 3) "|" phase[1] "|" phase[2]
+    key := ObjPtr(rows) "|" Round(s, 3) "|" phase[1] "|" phase[2]
     if cache.Has(key)
         return cache[key]
     light := [], dark := []
-    r := Ceil(10 * s) + 1
+    r := Ceil(Max(rows.Length, StrLen(rows[1])) / 2 * s) + 1
     loop 2 * r + 1 {
         v := A_Index - 1 - r
         loop 2 * r + 1 {
@@ -128,7 +129,7 @@ OffShapeAt(s, phase) {
                 ty := Floor((v + phase[2] - 0.5 + (A_Index - 0.5) / 4) / s + 0.5)
                 loop 4 {
                     tx := Floor((u + phase[1] - 0.5 + (A_Index - 0.5) / 4) / s + 0.5)
-                    ch := ShapeCell(tx, ty)
+                    ch := ShapeCell(rows, tx, ty)
                     n += 1
                     if ch = "#"
                         nl += 1
@@ -146,12 +147,12 @@ OffShapeAt(s, phase) {
     return cache[key]
 }
 
-; 틀의 (dx, dy) 칸 글자. 틀 밖은 " "(안 봄)
-ShapeCell(dx, dy) {
-    row := dy + 10, col := dx + 10
-    if row < 1 || row > AUTO_OFF_SHAPE.Length || col < 1 || col > StrLen(AUTO_OFF_SHAPE[row])
+; 틀 중심에서 (dx, dy) 떨어진 칸 글자. 틀 밖은 " "(안 봄)
+ShapeCell(rows, dx, dy) {
+    row := dy + (rows.Length + 1) // 2, col := dx + (StrLen(rows[1]) + 1) // 2
+    if row < 1 || row > rows.Length || col < 1 || col > StrLen(rows[row])
         return " "
-    return SubStr(AUTO_OFF_SHAPE[row], col, 1)
+    return SubStr(rows[row], col, 1)
 }
 
 ; 후보 중 하나라도 켜짐이면 켜짐 (켜진 걸 꺼짐으로 잘못 보고 T를 눌러 끄는 일을 막는다)
@@ -220,7 +221,7 @@ CaptureScreen(sx, sy, w, h) {
 wgc := {dll: 0, failed: false, ptr: 0, hwnd: 0}
 
 ; 게임 클라이언트 영역 전체 프레임 {bits, pitch, w, h}. 못 찍으면 0
-; 프레임은 wgc_releaseTexture 전까지만 유효하다.
+; 프레임은 다음 wgc_capture 전까지만 유효하다.
 WgcCapture(hwnd) {
     if wgc.failed
         return 0
@@ -271,6 +272,15 @@ CopyFrame(f, b) {
 ; 게임 창의 AUTO 버튼 상태: "on" / "off" / ""(버튼을 못 찾음) / "minimized"
 ; / "hidden"(WGC를 못 써서 화면으로 봤는데 버튼 자리가 다른 창에 가려짐)
 CheckAuto(hwnd) {
+    cap := CaptureAround(hwnd, AutoCandidates, AUTO_RING)
+    if !IsObject(cap)
+        return cap
+    return AutoJudge(cap.img, cap.cands)
+}
+
+; 게임 창에서 후보 위치들(candsFn(w, h)) 주변 반지름 ring 만큼만 잘라 온다.
+; {img, cands} 또는 "minimized" / "hidden"(WGC를 못 써서 화면으로 봤는데 그 자리가 다른 창에 가려짐)
+CaptureAround(hwnd, candsFn, ring) {
     if DllCall("IsIconic", "Ptr", hwnd)
         return "minimized"
     WinGetClientPos &gx, &gy, &gw, &gh, "ahk_id " hwnd
@@ -282,14 +292,15 @@ CheckAuto(hwnd) {
             WgcFree()
             continue
         }
-        cands := AutoCandidates(f.w, f.h)
-        img := CopyFrame(f, AutoBounds(cands))
-        DllCall("wincapture\wgc_releaseTexture", "Ptr", wgc.ptr)
-        return AutoJudge(img, cands)
+        cands := candsFn(f.w, f.h)
+        img := CopyFrame(f, AutoBounds(cands, ring))
+        ; wgc_releaseTexture 는 부르지 않는다. 다음 캡처가 같은 프레임이면 DLL 이 새로 복사하지 않고
+        ; 지난 텍스처를 그대로 읽는데, 비워 두면 그 자리에서 0xc0000005 로 죽는다. (AUTO·문파 도움 확인이 연달아 찍을 때)
+        return {img: img, cands: cands}
     }
 
-    cands := AutoCandidates(gw, gh)
-    b := AutoBounds(cands)
+    cands := candsFn(gw, gh)
+    b := AutoBounds(cands, ring)
     ; 버튼 자리 네 귀퉁이와 가운데가 전부 게임 창이어야 화면 픽셀을 믿을 수 있다
     for p in [[b.x, b.y], [b.x + b.w - 1, b.y], [b.x, b.y + b.h - 1], [b.x + b.w - 1, b.y + b.h - 1]
             , [b.x + b.w // 2, b.y + b.h // 2]] {
@@ -300,5 +311,5 @@ CheckAuto(hwnd) {
     }
     img := CaptureScreen(gx + b.x, gy + b.y, b.w, b.h)
     img.x0 := b.x, img.y0 := b.y
-    return AutoJudge(img, cands)
+    return {img: img, cands: cands}
 }

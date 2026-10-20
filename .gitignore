@@ -3,3 +3,4 @@ dist/
 *.old
 *.new
 target.ahk
+*.zip
