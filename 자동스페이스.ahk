@@ -10,10 +10,19 @@
 ; [백그라운드]를 끄면 예전처럼 게임 창이 맨 앞일 때만 누르고, [켜기] 때 게임 창을 앞으로 가져온다.
 ; [AUTO 유지]를 켜 두면 확인 간격마다 AUTO(T) 버튼 색을 보고, 꺼져 있으면 T를 눌러 다시 켠다. (AutoCheck.ahk)
 ; 게임 창이 가려져 있어도 확인하려면 wincapture.dll 이 이 파일(exe)과 같은 폴더에 있어야 한다. 최소화는 안 된다.
+; wincapture.dll 은 exe 안에 같이 들어 있어서, 없으면 켜질 때 꺼내 놓는다.
 ; 켜질 때 GitHub 에 새 버전이 있는지 보고, 있으면 물어본 뒤 스스로 바꿔 끼우고 다시 켜진다. (Update.ahk)
 ; F8: 켜기/끄기   F10: 종료
 
-APP_VERSION := "1.0.1"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
+APP_VERSION := "1.0.2"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
+
+; exe 하나만 받아도 되게 dll 을 꺼내 놓는다. 폴더에 쓸 수 없으면 화면 픽셀 방식으로 돌아간다. (AutoCheck.ahk)
+; (Ahk2Exe 는 줄이 FileInstall 로 시작해야 파일을 exe 에 넣는다)
+if !FileExist(A_ScriptDir "\wincapture.dll") {
+    try {
+        FileInstall "wincapture.dll", A_ScriptDir "\wincapture.dll"
+    }
+}
 
 SetTitleMatchMode 1  ; GAME 의 창 제목은 앞부분만 맞으면 된다
 GAME := ""           ; target.ahk 가 채운다

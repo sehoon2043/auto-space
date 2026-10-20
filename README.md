@@ -5,7 +5,8 @@ AUTO(T)가 꺼지면 다시 켜 주고, 켜질 때 새 버전이 있으면 스�
 
 ## 받기
 
-[Releases](../../releases/latest)에서 `AutoSpace.exe`와 `wincapture.dll`을 받아 **같은 폴더**에 두고 실행하세요.
+[Releases](../../releases/latest)에서 `AutoSpace.exe`만 받아 실행하면 됩니다.
+`wincapture.dll`은 exe 안에 들어 있어서, 같은 폴더에 없으면 처음 켤 때 꺼내 놓습니다.
 (exe 이름은 바꿔도 됩니다. 업데이트는 지금 이름 그대로 바꿔 끼웁니다.)
 
 ## 쓰는 법
