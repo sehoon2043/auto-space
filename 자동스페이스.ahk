@@ -13,7 +13,7 @@
 ; 켜질 때 GitHub 에 새 버전이 있는지 보고, 있으면 물어본 뒤 스스로 바꿔 끼우고 다시 켜진다. (Update.ahk)
 ; F8: 켜기/끄기   F10: 종료
 
-APP_VERSION := "1.0.0"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
+APP_VERSION := "1.0.1"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
 
 SetTitleMatchMode 1  ; GAME 의 창 제목은 앞부분만 맞으면 된다
 GAME := ""           ; target.ahk 가 채운다
