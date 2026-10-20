@@ -14,7 +14,7 @@
 ; 켜질 때 GitHub 에 새 버전이 있는지 보고, 있으면 물어본 뒤 스스로 바꿔 끼우고 다시 켜진다. (Update.ahk)
 ; F8: 켜기/끄기   F10: 종료
 
-APP_VERSION := "1.0.2"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
+APP_VERSION := "1.0.3"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
 
 ; exe 하나만 받아도 되게 dll 을 꺼내 놓는다. 폴더에 쓸 수 없으면 화면 픽셀 방식으로 돌아간다. (AutoCheck.ahk)
 ; (Ahk2Exe 는 줄이 FileInstall 로 시작해야 파일을 exe 에 넣는다)
@@ -69,7 +69,8 @@ g.SetFont("s9 norm")
 g.AddButton("w250", "종료").OnEvent("Click", (*) => ExitApp())
 g.AddText("w250 Center cGray", "F8 = 켜기/끄기, F10 = 종료")
 g.AddText("w160 y+6 Section cGray", "v" APP_VERSION)
-g.AddButton("x+0 ys-4 w90 h22", "업데이트 확인").OnEvent("Click", (*) => CheckForUpdate())
+g.AddButton("x+0 ys-4 w90 h22", "업데이트 확인").OnEvent("Click", (*) => CheckForUpdate(ShowUpdateStatus, g.Hwnd))
+lblUpdate := g.AddText("xm w250 cGray")
 g.OnEvent("Close", (*) => ExitApp())
 
 Refresh()
@@ -78,7 +79,7 @@ SetTimer Refresh, 200
 
 CleanupUpdateFiles()
 SetTimer CleanupUpdateFiles, -5000          ; 방금 끝난 예전 exe 가 아직 안 닫혔을 수 있다
-SetTimer () => CheckForUpdate(true), -1500  ; 창이 뜬 뒤에 조용히 확인
+SetTimer () => CheckForUpdate(ShowUpdateStatus, g.Hwnd), -1500  ; 창이 뜬 뒤에 확인
 
 F8:: {
     SetOn(!isOn)
@@ -258,6 +259,11 @@ Refresh() {
     SetText(lblCount, "누른 횟수: " count)
     SetText(lblAuto, autoStatus)
     SetText(btn, isOn ? "끄기" : "켜기")
+}
+
+; 업데이트 확인 결과를 버튼 아래 줄에 보여 준다 (Update.ahk 가 부른다)
+ShowUpdateStatus(text) {
+    SetText(lblUpdate, text)
 }
 
 ; GAME 창의 hwnd. 설정이 비어 있으면 아무 창이나 잡지 않게 0

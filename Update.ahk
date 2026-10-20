@@ -8,36 +8,58 @@
 UPDATE_REPO := "sehoon2043/auto-space"
 UPDATE_EXE_ASSET := "AutoSpace.exe"
 
-; 최신 버전을 확인하고, 새 버전이 있으면 물어본 뒤 업데이트한다. silent 면 문제없을 때 아무 말도 안 한다.
-CheckForUpdate(silent := false) {
+; 최신 버전을 확인하고, 새 버전이 있으면 물어본 뒤 업데이트한다.
+; report(text): 진행 상황을 화면에 보여 줄 함수 (확인 중… / 최신 버전 / 실패). owner: 물어보는 창을 이 창 앞에 띄운다.
+CheckForUpdate(report := "", owner := 0) {
+    static busy := false
+    if busy
+        return
+    busy := true
+    try {
+        DoCheckForUpdate(report, owner)
+    } finally {
+        busy := false
+    }
+}
+
+DoCheckForUpdate(report, owner) {
+    Say(t) {  ; (AHK 는 대소문자를 안 가려서 report 와 다른 이름이어야 한다)
+        if report
+            report(t)
+    }
+    opt := owner ? " Owner" owner : ""
+    Say("업데이트 확인 중…")
+    Sleep 10  ; 아래 요청이 끝날 때까지 창이 멈추므로 글자를 먼저 그리게 한다
     try {
         ; latest 리다이렉트는 GitHub 가 몇 분 캐시해서, 매번 다른 쿼리를 붙여야 새 릴리스가 바로 보인다
         text := StrGet(HttpGet("https://github.com/" UPDATE_REPO "/releases/latest/download/latest.txt?t=" A_Now A_MSec), "UTF-8")
         m := ParseManifest(text)
     } catch as e {
-        if !silent
-            MsgBox "업데이트 정보를 못 받았어요.`n" e.Message, "자동 스페이스", "Icon!"
+        Say("업데이트 확인 실패 (인터넷 연결을 확인해 주세요)")
         return
     }
     if CompareVersion(m["version"], APP_VERSION) <= 0 {
-        if !silent
-            MsgBox "최신 버전이에요. (v" APP_VERSION ")", "자동 스페이스", "Iconi"
+        Say("최신 버전이에요 (" FormatTime(, "HH:mm") " 확인)")
         return
     }
-    msg := "새 버전 v" m["version"] " 이 있어요. (지금 v" APP_VERSION ")`n"
+    Say("새 버전 v" m["version"] "가 있어요")
+    msg := "새 버전 v" m["version"] "가 있어요. (지금 v" APP_VERSION ")`n"
     if m.Has("notes") && m["notes"] != ""
         msg .= "`n" m["notes"] "`n"
     msg .= "`n지금 업데이트할까요? 매크로가 다시 시작돼요."
-    if MsgBox(msg, "자동 스페이스 업데이트", "YesNo Iconi") != "Yes"
+    if MsgBox(msg, "자동 스페이스 업데이트", "YesNo Iconi" opt) != "Yes"
         return
     if !A_IsCompiled {
-        MsgBox "스크립트(.ahk)로 실행 중이라 자동 교체는 안 해요. exe 로 실행하면 돼요.", "자동 스페이스", "Icon!"
+        MsgBox "스크립트(.ahk)로 실행 중이라 자동 교체는 안 해요. exe 로 실행하면 돼요.", "자동 스페이스", "Icon!" opt
         return
     }
+    Say("새 버전 받는 중…")
+    Sleep 10
     try {
         ApplyUpdate(m)
     } catch as e {
-        MsgBox "업데이트 실패 - 지금 버전을 그대로 써요.`n" e.Message, "자동 스페이스", "Icon!"
+        Say("업데이트 실패 - 지금 버전을 그대로 써요")
+        MsgBox "업데이트 실패 - 지금 버전을 그대로 써요.`n" e.Message, "자동 스페이스", "Icon!" opt
         return
     }
     Run '"' A_ScriptFullPath '"'
