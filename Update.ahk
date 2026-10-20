@@ -11,7 +11,8 @@ UPDATE_EXE_ASSET := "AutoSpace.exe"
 ; 최신 버전을 확인하고, 새 버전이 있으면 물어본 뒤 업데이트한다. silent 면 문제없을 때 아무 말도 안 한다.
 CheckForUpdate(silent := false) {
     try {
-        text := StrGet(HttpGet("https://github.com/" UPDATE_REPO "/releases/latest/download/latest.txt"), "UTF-8")
+        ; latest 리다이렉트는 GitHub 가 몇 분 캐시해서, 매번 다른 쿼리를 붙여야 새 릴리스가 바로 보인다
+        text := StrGet(HttpGet("https://github.com/" UPDATE_REPO "/releases/latest/download/latest.txt?t=" A_Now A_MSec), "UTF-8")
         m := ParseManifest(text)
     } catch as e {
         if !silent
