@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 #SingleInstance Force
 ;@Ahk2Exe-SetName 자동 스페이스
 ;@Ahk2Exe-SetDescription 자동 스페이스
@@ -13,10 +13,11 @@
 ; 스페이스 간격, AUTO 확인 간격, 문파 도움 확인 간격은 각각 따로 정한다.
 ; 게임 창이 가려져 있어도 확인하려면 wincapture.dll 이 이 파일(exe)과 같은 폴더에 있어야 한다. 최소화는 안 된다.
 ; wincapture.dll 은 exe 안에 같이 들어 있어서, 없으면 켜질 때 꺼내 놓는다.
-; 켜질 때 GitHub 에 새 버전이 있는지 보고, 있으면 물어본 뒤 스스로 바꿔 끼우고 다시 켜진다. (Update.ahk)
+; 켜질 때와 30분마다 GitHub 에 새 버전이 있는지 보고, 있으면 묻지 않고 바꿔 끼운 뒤 다시 켜진다. (Update.ahk)
+; 다시 켜질 때 켜짐 상태와 설정을 인자로 넘겨서 그대로 이어 간다. (ResumeArgs)
 ; F8: 켜기/끄기   F10: 종료
 
-APP_VERSION := "1.0.4"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
+APP_VERSION := "1.0.5"  ; 릴리스.bat 이 이 값으로 v태그를 만든다. 릴리스마다 올릴 것.
 
 ; exe 하나만 받아도 되게 dll 을 꺼내 놓는다. 폴더에 쓸 수 없으면 화면 픽셀 방식으로 돌아간다. (AutoCheck.ahk)
 ; (Ahk2Exe 는 줄이 FileInstall 로 시작해야 파일을 exe 에 넣는다)
@@ -100,17 +101,52 @@ g.SetFont("s9 norm")
 g.AddButton("xm w" W, "종료").OnEvent("Click", (*) => ExitApp())
 g.AddText("xm w" W " Center cGray", "F8 = 켜기/끄기, F10 = 종료")
 g.AddText("xm y+8 w" (W - 90) " Section cGray", "v" APP_VERSION)
-g.AddButton("x+0 ys-4 w90 h22", "업데이트 확인").OnEvent("Click", (*) => CheckForUpdate(ShowUpdateStatus, g.Hwnd))
+g.AddButton("x+0 ys-4 w90 h22", "업데이트 확인").OnEvent("Click", (*) => CheckForUpdate(ShowUpdateStatus, ResumeArgs))
 lblUpdate := g.AddText("xm w" W " cGray")
 g.OnEvent("Close", (*) => ExitApp())
 
-Refresh()
+; 업데이트로 다시 켜졌으면 예전 설정과 켜짐 상태를 이어 간다 (ResumeArgs 가 만든 인자)
+resumeOn := false
+if A_Args.Length = 9 && A_Args[1] = "--resume" {
+    edInterval.Value := A_Args[3]
+    chkAuto.Value := A_Args[4]
+    edAutoInterval.Value := A_Args[5]
+    chkIcon.Value := A_Args[6]
+    edIconInterval.Value := A_Args[7]
+    chkBg.Value := A_Args[8]
+    chkTop.Value := A_Args[9]
+    g.Opt((chkTop.Value ? "+" : "-") "AlwaysOnTop")
+    resumeOn := A_Args[2] = "1"
+}
+
+Refresh()  ; 간격 칸 값을 변수로 읽어 들인다
 g.Show()
 SetTimer Refresh, 200
 
+; 게임이 일반 권한 프로그램의 창 메시지를 막아서, 관리자 권한이 아니면 키도 클릭도 안 들어간다
+if !A_IsAdmin {
+    msg := "관리자 권한으로 실행해 주세요.`n일반 권한으로는 게임에 스페이스·T·클릭이 들어가지 않아요.`n`n지금 관리자 권한으로 다시 켤까요?"
+    if MsgBox(msg, APP_TITLE, "YesNo Icon! Owner" g.Hwnd) = "Yes" {
+        args := ""
+        for a in A_Args
+            args .= " " a
+        try {
+            Run '*RunAs "' A_ScriptFullPath '"' args
+            ExitApp
+        }
+        ; 권한 창에서 [아니요]를 누르면 여기로 와서 일반 권한으로 계속한다
+    }
+}
+if resumeOn {
+    gameHwnd := FindGame()
+    SetOn(true)
+}
+
+UPDATE_EVERY_MIN := 30
 CleanupUpdateFiles()
 SetTimer CleanupUpdateFiles, -5000          ; 방금 끝난 예전 exe 가 아직 안 닫혔을 수 있다
-SetTimer () => CheckForUpdate(ShowUpdateStatus, g.Hwnd), -1500  ; 창이 뜬 뒤에 확인
+SetTimer () => CheckForUpdate(ShowUpdateStatus, ResumeArgs), -1500  ; 창이 뜬 뒤에 확인
+SetTimer () => CheckForUpdate(ShowUpdateStatus, ResumeArgs), UPDATE_EVERY_MIN * 60000
 
 F8:: {
     SetOn(!isOn)
@@ -383,7 +419,9 @@ Refresh() {
     }
 
     found := FindGame()
-    if GAME = ""
+    if !A_IsAdmin
+        SetText(lblGame, "관리자 권한이 아니에요 → 관리자로 실행하세요", "cRed")
+    else if GAME = ""
         SetText(lblGame, "대상 창 설정(target.ahk)이 없어요", "cRed")
     else if found
         SetText(lblGame, "게임 창: 찾음", "cGreen")
@@ -435,6 +473,12 @@ SetBanner(text, color) {
         lblBanner.Redraw()
         lastColor := color
     }
+}
+
+; 업데이트 뒤 새 exe 에 넘길 인자: --resume 켜짐 스페이스간격 AUTO사용 AUTO간격 문파사용 문파간격 백그라운드 항상위
+ResumeArgs() {
+    return "--resume " (isOn ? 1 : 0) " " interval " " chkAuto.Value " " autoInterval " "
+        . chkIcon.Value " " iconInterval " " chkBg.Value " " chkTop.Value
 }
 
 ; 업데이트 확인 결과를 버튼 아래 줄에 보여 준다 (Update.ahk 가 부른다)

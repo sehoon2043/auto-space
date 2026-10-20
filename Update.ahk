@@ -8,26 +8,27 @@
 UPDATE_REPO := "sehoon2043/auto-space"
 UPDATE_EXE_ASSET := "AutoSpace.exe"
 
-; 최신 버전을 확인하고, 새 버전이 있으면 물어본 뒤 업데이트한다.
-; report(text): 진행 상황을 화면에 보여 줄 함수 (확인 중… / 최신 버전 / 실패). owner: 물어보는 창을 이 창 앞에 띄운다.
-CheckForUpdate(report := "", owner := 0) {
+; 최신 버전을 확인하고, 새 버전이 있으면 묻지 않고 받아서 바꿔 끼운 뒤 다시 켠다.
+; 대화상자를 띄우면 그동안 매크로가 멈추므로 결과는 report 로만 알린다.
+; report(text): 진행 상황을 화면에 보여 줄 함수 (확인 중… / 최신 버전 / 실패)
+; restartArgs(): 다시 켤 새 exe 에 넘길 인자 (켜짐 상태와 설정을 이어 가게). 다시 켜기 직전에 부른다.
+CheckForUpdate(report := "", restartArgs := "") {
     static busy := false
     if busy
         return
     busy := true
     try {
-        DoCheckForUpdate(report, owner)
+        DoCheckForUpdate(report, restartArgs)
     } finally {
         busy := false
     }
 }
 
-DoCheckForUpdate(report, owner) {
+DoCheckForUpdate(report, restartArgs) {
     Say(t) {  ; (AHK 는 대소문자를 안 가려서 report 와 다른 이름이어야 한다)
         if report
             report(t)
     }
-    opt := owner ? " Owner" owner : ""
     Say("업데이트 확인 중…")
     Sleep 10  ; 아래 요청이 끝날 때까지 창이 멈추므로 글자를 먼저 그리게 한다
     try {
@@ -42,27 +43,20 @@ DoCheckForUpdate(report, owner) {
         Say("최신 버전이에요 (" FormatTime(, "HH:mm") " 확인)")
         return
     }
-    Say("새 버전 v" m["version"] "가 있어요")
-    msg := "새 버전 v" m["version"] "가 있어요. (지금 v" APP_VERSION ")`n"
-    if m.Has("notes") && m["notes"] != ""
-        msg .= "`n" m["notes"] "`n"
-    msg .= "`n지금 업데이트할까요? 매크로가 다시 시작돼요."
-    if MsgBox(msg, "자동 스페이스 업데이트", "YesNo Iconi" opt) != "Yes"
-        return
     if !A_IsCompiled {
-        MsgBox "스크립트(.ahk)로 실행 중이라 자동 교체는 안 해요. exe 로 실행하면 돼요.", "자동 스페이스", "Icon!" opt
+        Say("새 버전 v" m["version"] "가 있어요 (.ahk 실행이라 자동 교체 안 함)")
         return
     }
-    Say("새 버전 받는 중…")
+    Say("새 버전 v" m["version"] " 받는 중…")
     Sleep 10
     try {
         ApplyUpdate(m)
     } catch as e {
-        Say("업데이트 실패 - 지금 버전을 그대로 써요")
-        MsgBox "업데이트 실패 - 지금 버전을 그대로 써요.`n" e.Message, "자동 스페이스", "Icon!" opt
+        Say("업데이트 실패 - 지금 버전을 그대로 써요 (" FormatTime(, "HH:mm") ")")
         return
     }
-    Run '"' A_ScriptFullPath '"'
+    args := restartArgs ? " " restartArgs() : ""
+    Run '"' A_ScriptFullPath '"' args
     ExitApp
 }
 
